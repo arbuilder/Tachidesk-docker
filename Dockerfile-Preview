@@ -1,0 +1,19 @@
+FROM openjdk:latest
+
+LABEL maintainer "arbuild"
+
+RUN useradd -ms /bin/bash arbuilder
+
+RUN mkdir -p /home/arbuilder && chown -R arbuilder:arbuilder /home/arbuilder
+
+USER arbuilder
+
+WORKDIR /home/arbuilder
+
+RUN curl -s --create-dirs -L https://raw.githubusercontent.com/arbuilder/Tachidesk-docker/main/startup_script.sh -o /home/arbuilder/startup/startup_script.sh
+
+RUN curl -L https://raw.githubusercontent.com/Suwayomi/Tachidesk-preview/main/Tachidesk-$(curl -s "https://raw.githubusercontent.com/Suwayomi/Tachidesk-preview/main/index.json" | cut -d" " -f3 | cut -d\" -f2).jar -o /home/arbuilder/startup/tachidesk_latest.jar
+
+EXPOSE 4567
+
+CMD ["/bin/sh", "/home/arbuilder/startup/startup_script.sh"]

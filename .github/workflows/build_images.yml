@@ -1,0 +1,260 @@
+name: Build Docker Images
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *"
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GIT_WORKFLOW_ACCESS_TOKEN }}
+  build_owner_git: 'arbuilder'
+  build_repo_git: 'tachidesk-docker'
+  build_owner_docker: 'arbuild'
+  build_repo_docker: 'tachidesk-docker'
+  startup_script_stable_url: 'https://raw.githubusercontent.com/arbuilder/Tachidesk-docker/main/startup_script.sh'
+  startup_script_preview_url: 'https://raw.githubusercontent.com/arbuilder/Tachidesk-docker/main/startup_script.sh'
+  build_base_image: 'openjdk:latest'
+  build_base_image_platform: 'linux/amd64,linux/arm64/v8'
+  build_base_image_alpine: 'alpine:latest'
+  build_base_image_alpine_platform: 'linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x'
+  
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: "!startsWith(github.event.head_commit.message, '[SKIP CI]')"
+    steps:
+      - name: Cancel previous runs
+        uses: styfle/cancel-workflow-action@0.5.0
+        with:
+          access_token: ${{ github.token }}
+    
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: main
+          path: main
+          fetch-depth: 0
+          
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: get latest release metadata
+        id: get_latest_release_metadata
+        run: |
+          cd main
+          stable_tag=$(curl -s https://api.github.com/repos/Suwayomi/Tachidesk/releases/latest | egrep -o "tag_name.*.v[0-9]+.[0-9]+.[0-9]+" | egrep -o "v[0-9]+.[0-9]+.[0-9]+")
+          stable_url=$(curl -s https://api.github.com/repos/Suwayomi/Tachidesk/releases/latest | egrep -o "https://.*.download/$stable_tag/Tachidesk-$stable_tag-r[0-9]+.jar")
+          stable_var=$(echo $stable_url | egrep -o "Tachidesk-$stable_tag-r[0-9]+.jar" | egrep -o "$stable_tag-r[0-9]+")
+          stable_commit=$(echo $stable_var | cut -f2 -d"r")
+          stable_filename=Tachidesk-${stable_var}.jar
+          stable_version=$(echo $stable_tag | cut -c2-)
+          echo "::set-output name=stable_url::$stable_url"
+          echo "::set-output name=stable_commit::$stable_commit"
+          echo "::set-output name=stable_tag::$stable_tag"
+          echo "::set-output name=stable_filename::$stable_filename"
+          echo "::set-output name=stable_version::$stable_version"
+          echo "::set-output name=stable_var::$stable_var"
+          preview_tag=$(curl -s https://api.github.com/repos/Suwayomi/Tachidesk-preview/releases/latest | egrep -o "tag_name.*.v[0-9]+.[0-9]+.[0-9]+-r[0-9]+" | egrep -o "v[0-9]+.[0-9]+.[0-9]+-r[0-9]+")
+          preview_url=$(curl -s https://api.github.com/repos/Suwayomi/Tachidesk-preview/releases/latest | egrep -o "https://.*.download/$preview_tag/Tachidesk-$preview_tag.jar")
+          preview_var=$(echo $preview_url | grep -o "Tachidesk-$preview_tag.jar" | grep -o "$preview_tag" )
+          preview_commit=$(echo $preview_var | cut -f2 -d"r")
+          preview_filename=Tachidesk-${preview_var}.jar
+          preview_version=$(echo $preview_tag | cut -c2-)
+          echo "::set-output name=preview_url::$preview_url"
+          echo "::set-output name=preview_commit::$preview_commit"
+          echo "::set-output name=preview_tag::$preview_tag"
+          echo "::set-output name=preview_filename::$preview_filename"
+          echo "::set-output name=preview_version::$preview_version"
+          echo "::set-output name=preview_var::$preview_var"
+          tachidesk_docker_git_commit=$(git rev-list --count HEAD)
+          echo "::set-output name=tachidesk_docker_git_commit::$tachidesk_docker_git_commit"
+          build_date=$(date "+%F")
+          echo "::set-output name=build_date::$build_date"
+
+      - name: Run Release stable check
+        id: release_stable_check
+        run: | 
+            cd main
+            docker_version_stable=$(jq -r '.stable' scripts/tachidesk_version.json)
+            git_version_stable=$(echo ${{ steps.get_latest_release_metadata.outputs.stable_tag }})
+            if [[ $docker_version_stable == $git_version_stable || steps.get_latest_release_metadata.outputs.stable_var == "" ]]; then
+                echo "No Tachidesk stable updates"
+                echo "::set-output name=value::false"
+            else
+                echo "New Tachidesk stable jar is avilable"
+                echo "::set-output name=value::true"
+            fi
+
+      - name: Build and push stable
+        if: steps.release_stable_check.outputs.value == 'true'      
+        id: docker_build_stable
+        uses: docker/build-push-action@v2
+        with:
+          file: scripts/dockerfiles/Git_Actions-Dockerfile
+          platforms: ${{ env.build_base_image_platform }}
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.build_base_image }}
+            BUILD_DATE=${{ steps.get_latest_release_metadata.outputs.build_date }}
+            IMAGE_VERSION=${{ steps.get_latest_release_metadata.outputs.stable_version }}
+            IMAGE_TYPE=stable
+            TACHIDESK_GIT_COMMIT=${{ steps.get_latest_release_metadata.outputs.stable_commit }}
+            TACHIDESK_RELEASE_TAG=${{ steps.get_latest_release_metadata.outputs.stable_tag }}
+            TACHIDESK_RELEASE_DOWNLOAD_URL=${{ steps.get_latest_release_metadata.outputs.stable_url }}
+            TACHIDESK_FILENAME=${{ steps.get_latest_release_metadata.outputs.stable_filename }}
+            STARTUP_SCRIPT_URL=${{ env.startup_script_stable_url }}
+            TACHIDESK_DOCKER_GIT_COMMIT=${{ steps.get_latest_release_metadata.outputs.tachidesk_docker_git_commit }}
+          tags: |
+            ${{ env.build_owner_docker }}/${{ env.build_repo_docker }}:latest
+            ${{ env.build_owner_docker }}/${{ env.build_repo_docker }}:${{ steps.get_latest_release_metadata.outputs.stable_tag }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+          
+      - name: Build and push stable alpine
+        if: steps.release_stable_check.outputs.value == 'true'
+        id: docker_build_stable_alpine
+        uses: docker/build-push-action@v2
+        with:
+          file: scripts/dockerfiles/Git_Actions-Dockerfile
+          platforms: ${{ env.build_base_image_alpine_platform }}
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.build_base_image_alpine }}
+            BUILD_DATE=${{ steps.get_latest_release_metadata.outputs.build_date }}
+            IMAGE_VERSION=${{ steps.get_latest_release_metadata.outputs.stable_version }}
+            IMAGE_TYPE=stable-alpine
+            TACHIDESK_GIT_COMMIT=${{ steps.get_latest_release_metadata.outputs.stable_commit }}
+            TACHIDESK_RELEASE_TAG=${{ steps.get_latest_release_metadata.outputs.stable_tag }}
+            TACHIDESK_RELEASE_DOWNLOAD_URL=${{ steps.get_latest_release_metadata.outputs.stable_url }}
+            TACHIDESK_FILENAME=${{ steps.get_latest_release_metadata.outputs.stable_filename }}
+            STARTUP_SCRIPT_URL=${{  env.startup_script_stable_url }}
+            TACHIDESK_DOCKER_GIT_COMMIT=${{ steps.get_latest_release_metadata.outputs.tachidesk_docker_git_commit }}
+          tags: |
+            ${{ env.build_owner_docker }}/${{ env.build_repo_docker }}:slim
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+
+      - name: save stable release
+        if: steps.release_stable_check.outputs.value == 'true'
+        run: |
+          cd main
+          echo "`jq '.stable="${{ steps.get_latest_release_metadata.outputs.stable_tag }}"' scripts/tachidesk_version.json`" > scripts/tachidesk_version.json
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git status
+          if [ -n "$(git status --porcelain)" ]; then
+              git pull
+              git add .
+              git commit -m "Update stable release version"
+              git push
+          else
+              echo "No changes to commit"
+          fi
+
+      - name: Run Release preview check
+        id: release_preview_check
+        run: | 
+            cd main
+            docker_version_preview=$(jq -r '.preview' scripts/tachidesk_version.json)
+            git_version_preview=${{ steps.get_latest_release_metadata.outputs.preview_tag }}
+            if [[ $docker_version_preview == $git_version_preview || steps.get_latest_release_metadata.outputs.preview_var == "" ]]; then
+                echo "No Tachidesk preview updates"
+                echo "::set-output name=value::false"
+            else
+                echo "New Tachidesk preview jar is avilable"
+                echo "::set-output name=value::true"
+            fi
+
+      - name: Build and push preview
+        if: steps.release_preview_check.outputs.value == 'true'
+        id: docker_build_preview
+        uses: docker/build-push-action@v2
+        with:
+          file: scripts/dockerfiles/Git_Actions-Dockerfile
+          platforms: ${{ env.build_base_image_platform }}
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.build_base_image }}
+            BUILD_DATE=${{ steps.get_latest_release_metadata.outputs.build_date }}
+            IMAGE_VERSION=${{ steps.get_latest_release_metadata.outputs.preview_version }}
+            IMAGE_TYPE=preview
+            TACHIDESK_GIT_COMMIT=${{ steps.get_latest_release_metadata.outputs.preview_commit }}
+            TACHIDESK_RELEASE_TAG=${{ steps.get_latest_release_metadata.outputs.preview_tag }}
+            TACHIDESK_RELEASE_DOWNLOAD_URL=${{ steps.get_latest_release_metadata.outputs.preview_url }}
+            TACHIDESK_FILENAME=${{ steps.get_latest_release_metadata.outputs.preview_filename }}
+            STARTUP_SCRIPT_URL=${{ env.startup_script_preview_url }}
+            TACHIDESK_DOCKER_GIT_COMMIT=${{ steps.get_latest_release_metadata.outputs.tachidesk_docker_git_commit }}
+          tags: |
+            ${{ env.build_owner_docker }}/${{ env.build_repo_docker }}:preview
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+
+      - name: Build and push preview alpine
+        if: steps.release_preview_check.outputs.value == 'true'
+        id: docker_build_preview_alpine
+        uses: docker/build-push-action@v2
+        with:
+          file: scripts/dockerfiles/Git_Actions-Dockerfile
+          platforms: ${{ env.build_base_image_alpine_platform }}
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.build_base_image_alpine }}
+            BUILD_DATE=${{ steps.get_latest_release_metadata.outputs.build_date }}
+            IMAGE_VERSION=${{ steps.get_latest_release_metadata.outputs.preview_version }}
+            IMAGE_TYPE=preview-alpine
+            TACHIDESK_GIT_COMMIT=${{ steps.get_latest_release_metadata.outputs.preview_commit }}
+            TACHIDESK_RELEASE_TAG=${{ steps.get_latest_release_metadata.outputs.preview_tag }}
+            TACHIDESK_RELEASE_DOWNLOAD_URL=${{ steps.get_latest_release_metadata.outputs.preview_url }}
+            TACHIDESK_FILENAME=${{ steps.get_latest_release_metadata.outputs.preview_filename }}
+            STARTUP_SCRIPT_URL=${{ env.startup_script_preview_url }}
+            TACHIDESK_DOCKER_GIT_COMMIT=${{ steps.get_latest_release_metadata.outputs.tachidesk_docker_git_commit }}
+          tags: |
+            ${{ env.build_owner_docker }}/${{ env.build_repo_docker }}:preview-slim
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+
+      - name: save preview release
+        if: steps.release_preview_check.outputs.value == 'true'
+        run: |
+          cd main
+          echo "`jq '.preview="${{ steps.get_latest_release_metadata.outputs.preview_tag }}"' scripts/tachidesk_version.json`" > scripts/tachidesk_version.json
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git status
+          if [ -n "$(git status --porcelain)" ]; then
+              git pull
+              git add .
+              git commit -m "Update current preview version"
+              git push
+          else
+              echo "No changes to commit"
+          fi
+
+      # - name: Sync Github Dockerhub README
+        # uses: peter-evans/dockerhub-description@v2
+        # with:
+          # username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          # password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+          # repository: ${{ env.build_owner_docker }}/${{ env.build_repo_docker }}
+          # readme-filepath: ./main/README.md
+          # short-description: ${{ github.event.repository.description }}
+          
+          
+      - name: Clear older Build Docker Images workflows 
+        id: clear_older__build_docker_images_workflows
+        run: | 
+            echo "delete workflows older then last 5 run"
+            gh api repos/arbuilder/tachidesk-docker/actions/runs | jq -r '.workflow_runs[] | select(.head_branch == "main") | "\(.id)"' | sed '1,5d' | xargs -n1 -I % gh api repos/arbuilder/tachidesk-docker/actions/runs/% -X DELETE
