@@ -20,7 +20,7 @@ Slim version is mutli-arch (linux/386, linux/amd64, linux/arm/v6, linux/arm/v7, 
 
 ### Official Tachidesk Docker Images
 
-[docker.io/arbuild/tachidesk-docker](https://hub.docker.com/r/arbuild/tachidesk-docker) will be decreciated in the future as i am releasing the Official Tachidesk Docker Images builds on [ghcr.io/suwayomi/tachidesk](https://github.com/orgs/suwayomi/packages/container/package/tachidesk) (only alpine multiarch based docker images). Readme for [ghcr.io/suwayomi/tachidesk](https://github.com/orgs/suwayomi/packages/container/package/tachidesk) is avilable at https://github.com/suwayomi/docker-tachidesk.
+[docker.io/arbuild/tachidesk-docker](https://hub.docker.com/r/arbuild/tachidesk-docker) and this repo will be depreciated in the future as i am releasing the Official Tachidesk Docker Images builds on [ghcr.io/suwayomi/tachidesk](https://github.com/orgs/suwayomi/packages/container/package/tachidesk) (only alpine multiarch based docker images). Readme for [ghcr.io/suwayomi/tachidesk](https://github.com/orgs/suwayomi/packages/container/package/tachidesk) is avilable at https://github.com/suwayomi/docker-tachidesk.
 
 ### Tachidesk docker container versions
 
