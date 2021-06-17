@@ -18,7 +18,7 @@ env:
   startup_script_preview_url: 'https://raw.githubusercontent.com/arbuilder/Tachidesk-docker/main/startup_script.sh'
   build_base_image: 'openjdk:latest'
   build_base_image_platform: 'linux/amd64,linux/arm64/v8'
-  build_base_image_alpine: 'alpine:latest'
+  build_base_image_alpine: 'alpine:3.13'
   build_base_image_alpine_platform: 'linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x'
   
 jobs:
