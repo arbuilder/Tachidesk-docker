@@ -4,6 +4,19 @@
 |:-:|:-:|:-:|:-:|
 | [![Build Docker Images](https://github.com/arbuilder/Tachidesk-docker/actions/workflows/build_images.yml/badge.svg)](https://github.com/arbuilder/Tachidesk-docker/actions/workflows/build_images.yml) | [![Docker Pulls](https://img.shields.io/docker/pulls/arbuild/tachidesk-docker?label=dockerhub)](https://hub.docker.com/r/arbuild/tachidesk-docker/)  [![Docker Pulls](https://img.shields.io/badge/dynamic/json?url=https://github.com/suwayomi/docker-tachidesk/raw/main/scripts/tachidesk_version.json&label=github&query=$.total_downloads&color=blue)](https://github.com/orgs/suwayomi/packages/container/package/tachidesk)| [![Latest](https://img.shields.io/badge/dynamic/json?url=https://github.com/arbuilder/tachidesk-docker/raw/main/scripts/tachidesk_version.json&label=version&query=$.stable&color=blue) ![Latest](https://img.shields.io/docker/image-size/arbuild/tachidesk-docker/latest.svg?label=latest) ![Slim](https://img.shields.io/docker/image-size/arbuild/tachidesk-docker/slim.svg?label=slim)](https://hub.docker.com/r/arbuild/tachidesk-docker/) | [![Preview](https://img.shields.io/badge/dynamic/json?url=https://github.com/arbuilder/tachidesk-docker/raw/main/scripts/tachidesk_version.json&label=version&query=$.preview&color=blue) ![Preview](https://img.shields.io/docker/image-size/arbuild/tachidesk-docker/preview?label=preview) ![Slim](https://img.shields.io/docker/image-size/arbuild/tachidesk-docker/preview-slim.svg?label=preview-slim)](https://hub.docker.com/r/arbuild/tachidesk-docker/) |
 
+___________________________________________________________________________
+                           DEPRECATION NOTICE
+                                                
+     I have deprecated this container as official tachidesk container is available at 
+     https://github.com/Suwayomi/docker-tachidesk.
+     
+     I will not be updating new builds and Tachidesk v0.4.3 will be the last build for this repo.
+     
+     Please read the Readme (https://github.com/Suwayomi/docker-tachidesk) before 
+     running new official builds.
+     
+___________________________________________________________________________
+
 Run [Tachidesk](https://github.com/AriaMoradi/Tachidesk) server inside docker container as non-root user (arbuilder). The server will be running on http://localhost:4567 open this url in your browser.
 
 Dockerhub Image - https://hub.docker.com/repository/docker/arbuild/tachidesk-docker
